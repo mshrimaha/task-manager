@@ -1,6 +1,11 @@
 run = "cowsay Configure me!"
 entrypoint = "README.md"
+modules = ["python-3.11"]
 
 [nix]
-channel = "stable-24_05"
+channel = "stable-24_11"
 packages = ["cowsay"]
+
+[[ports]]
+localPort = 3000
+externalPort = 80

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My Tasks</title>
+    <style>
+        body { font-family: Arial; max-width: 500px; margin: 20px auto; padding: 10px; }
+        .task { border: 1px solid #ccc; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .done { background: #e0ffe0; }
+        input, button { padding: 8px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+    <h2>Welcome, {{ username }}</h2>
+    <a href="/logout">Logout</a>
+
+    <h3>Add Task</h3>
+    <form method="POST" action="/tasks/add">
+        <input name="title" placeholder="Task title" required>
+        <input name="description" placeholder="Description">
+        <input name="due_date" type="date">
+        <button type="submit">Add Task</button>
+    </form>
+
+    <h3>My Tasks</h3>
+    {% for task in tasks %}
+    <div class="task {% if task.status == 'done' %}done{% endif %}">
+        <b>{{ task.title }}</b> - {{ task.status }}<br>
+        {{ task.description }}<br>
+        Due: {{ task.due_date }}<br>
+        <form method="POST" action="/tasks/{{ task.id }}/update" style="display:inline">
+            <input type="hidden" name="status" value="done">
+            <button type="submit">Mark Done</button>
+        </form>
+        <form method="POST" action="/tasks/{{ task.id }}/delete" style="display:inline">
+            <button type="submit">Delete</button>
+        </form>
+    </div>
+    {% endfor %}
+</body>
+</html>
