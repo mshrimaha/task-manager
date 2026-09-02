@@ -31,22 +31,15 @@ def signup():
 
         existing_user = User.query.filter_by(username=username).first()
         if existing_user:
-            return "Username already taken"
+            return render_template('signup.html', error="Username already taken")
 
         new_user = User(username=username)
         new_user.set_password(password)
         db.session.add(new_user)
         db.session.commit()
-        return "Signup successful! Go to /login"
+        return redirect(url_for('login'))
 
-    return '''
-        <form method="POST">
-            Username: <input name="username"><br>
-            Password: <input name="password" type="password"><br>
-            <button type="submit">Sign Up</button>
-        </form>
-    '''
-
+    return render_template('signup.html')
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -54,21 +47,12 @@ def login():
         password = request.form['password']
 
         user = User.query.filter_by(username=username).first()
-
         if user and user.check_password(password):
             login_user(user)
             return redirect(url_for('dashboard'))
+        return render_template('login.html', error="Invalid username or password")
 
-        return "Invalid username or password"
-
-    return '''
-        <form method="POST">
-            Username: <input name="username"><br>
-            Password: <input name="password" type="password"><br>
-            <button type="submit">Log In</button>
-        </form>
-    '''
-
+    return render_template('login.html')
 @app.route('/logout')
 @login_required
 def logout():

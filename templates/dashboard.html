@@ -2,39 +2,135 @@
 <html>
 <head>
     <title>My Tasks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: Arial; max-width: 500px; margin: 20px auto; padding: 10px; }
-        .task { border: 1px solid #ccc; padding: 10px; margin: 10px 0; border-radius: 5px; }
-        .done { background: #e0ffe0; }
-        input, button { padding: 8px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 16px;
+            color: #222;
+        }
+        .container { max-width: 480px; margin: 0 auto; }
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        h2 { margin: 0; }
+        a.logout {
+            color: #dc2626;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .form-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 24px;
+        }
+        .form-card h3 { margin-top: 0; font-size: 16px; color: #555; }
+        input, select {
+            width: 100%;
+            padding: 12px;
+            margin: 6px 0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 8px;
+            background: #4f46e5;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+        }
+        .task {
+            background: white;
+            padding: 16px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            margin-bottom: 12px;
+            border-left: 4px solid #4f46e5;
+        }
+        .task.done { border-left-color: #16a34a; opacity: 0.75; }
+        .task-title { font-weight: bold; font-size: 16px; margin-bottom: 4px; }
+        .task-desc { color: #666; font-size: 14px; margin-bottom: 6px; }
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .badge.pending { background: #fef3c7; color: #92400e; }
+        .badge.done { background: #dcfce7; color: #166534; }
+        .task-due { font-size: 13px; color: #888; margin-bottom: 10px; }
+        .task-actions { display: flex; gap: 8px; }
+        .task-actions form { flex: 1; margin: 0; }
+        .task-actions button {
+            padding: 8px;
+            font-size: 13px;
+            margin: 0;
+        }
+        .btn-done { background: #16a34a; }
+        .btn-delete { background: #dc2626; }
+        .empty { text-align: center; color: #999; padding: 40px 0; }
     </style>
 </head>
 <body>
-    <h2>Welcome, {{ username }}</h2>
-    <a href="/logout">Logout</a>
+    <div class="container">
+        <div class="topbar">
+            <h2>Hi, {{ username }}</h2>
+            <a class="logout" href="/logout">Logout</a>
+        </div>
 
-    <h3>Add Task</h3>
-    <form method="POST" action="/tasks/add">
-        <input name="title" placeholder="Task title" required>
-        <input name="description" placeholder="Description">
-        <input name="due_date" type="date">
-        <button type="submit">Add Task</button>
-    </form>
+        <div class="form-card">
+            <h3>Add a new task</h3>
+            <form method="POST" action="/tasks/add">
+                <input name="title" placeholder="Task title" required>
+                <input name="description" placeholder="Description (optional)">
+                <input name="due_date" type="date">
+                <button type="submit">Add Task</button>
+            </form>
+        </div>
 
-    <h3>My Tasks</h3>
-    {% for task in tasks %}
-    <div class="task {% if task.status == 'done' %}done{% endif %}">
-        <b>{{ task.title }}</b> - {{ task.status }}<br>
-        {{ task.description }}<br>
-        Due: {{ task.due_date }}<br>
-        <form method="POST" action="/tasks/{{ task.id }}/update" style="display:inline">
-            <input type="hidden" name="status" value="done">
-            <button type="submit">Mark Done</button>
-        </form>
-        <form method="POST" action="/tasks/{{ task.id }}/delete" style="display:inline">
-            <button type="submit">Delete</button>
-        </form>
+        {% if tasks %}
+            {% for task in tasks %}
+            <div class="task {% if task.status == 'done' %}done{% endif %}">
+                <span class="badge {{ task.status }}">{{ task.status }}</span>
+                <div class="task-title">{{ task.title }}</div>
+                {% if task.description %}
+                <div class="task-desc">{{ task.description }}</div>
+                {% endif %}
+                {% if task.due_date %}
+                <div class="task-due">Due: {{ task.due_date }}</div>
+                {% endif %}
+                <div class="task-actions">
+                    {% if task.status != 'done' %}
+                    <form method="POST" action="/tasks/{{ task.id }}/update">
+                        <input type="hidden" name="status" value="done">
+                        <button type="submit" class="btn-done">Mark Done</button>
+                    </form>
+                    {% endif %}
+                    <form method="POST" action="/tasks/{{ task.id }}/delete">
+                        <button type="submit" class="btn-delete">Delete</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty">No tasks yet — add one above!</div>
+        {% endif %}
     </div>
-    {% endfor %}
 </body>
 </html>
