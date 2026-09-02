@@ -1,10 +1,40 @@
 from flask import Flask, request, redirect, url_for, render_template, flash
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from models import db, User, Task
+import re
+
+def is_strong_password(password):
+    if len(password) < 8:
+        return False, "Password must contain at least 8 characters."
+
+    if not re.search(r"[A-Z]", password):
+        return False, "Password must contain at least one uppercase letter."
+
+    if not re.search(r"[a-z]", password):
+        return False, "Password must contain at least one lowercase letter."
+
+    if not re.search(r"\d", password):
+        return False, "Password must contain at least one number."
+
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        return False, "Password must contain at least one special character."
+
+    return True, ""
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///taskmanager.db'
-app.config['SECRET_KEY'] = 'change-this-later'
+import os
+
+database_url = os.environ.get("DATABASE_URL")
+
+if database_url:
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///taskmanager.db'
+
+app.config['SECRET_KEY'] = os.environ.get(
+    'SECRET_KEY',
+    'temporary-local-development-key'
+)
 
 db.init_app(app)
 
@@ -29,11 +59,15 @@ def signup():
         username = request.form['username']
         password = request.form['password']
 
+        valid, message = is_strong_password(password)
+        if not valid:
+            return render_template('signup.html', error=message)
+
         existing_user = User.query.filter_by(username=username).first()
         if existing_user:
             return render_template('signup.html', error="Username already taken")
 
-        new_user = User(username=username)
+        new_user = User(username=username) 
         new_user.set_password(password)
         db.session.add(new_user)
         db.session.commit()
