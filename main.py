@@ -1,7 +1,21 @@
-from flask import Flask, request, redirect, url_for, render_template, flash
-from flask_login import LoginManager, login_user, login_required, logout_user, current_user
-from models import db, User, Task
+import os
 import re
+
+from flask import Flask, request, redirect, url_for, render_template
+from flask_login import (
+    LoginManager,
+    login_user,
+    login_required,
+    logout_user,
+    current_user
+)
+
+from models import db, User, Task
+
+
+# -----------------------------------
+# PASSWORD VALIDATION
+# -----------------------------------
 
 def is_strong_password(password):
     if len(password) < 8:
@@ -21,126 +35,331 @@ def is_strong_password(password):
 
     return True, ""
 
+
+# -----------------------------------
+# FLASK APP
+# -----------------------------------
+
 app = Flask(__name__)
-import os
+
+
+# -----------------------------------
+# DATABASE CONFIGURATION
+# -----------------------------------
 
 database_url = os.environ.get("DATABASE_URL")
 
 if database_url:
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-else:
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///taskmanager.db'
+    # Fix old PostgreSQL URL format if needed
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace(
+            "postgres://",
+            "postgresql://",
+            1
+        )
 
-app.config['SECRET_KEY'] = os.environ.get(
-    'SECRET_KEY',
-    'temporary-local-development-key'
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+
+else:
+    # SQLite for Replit/local development
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///taskmanager.db"
+
+
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+
+# -----------------------------------
+# SECRET KEY
+# -----------------------------------
+
+app.config["SECRET_KEY"] = os.environ.get(
+    "SECRET_KEY",
+    "temporary-local-development-key"
 )
+
+
+# -----------------------------------
+# DATABASE INITIALIZATION
+# -----------------------------------
 
 db.init_app(app)
 
+
+# -----------------------------------
+# LOGIN MANAGER
+# -----------------------------------
+
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'login'
+login_manager.login_view = "login"
+
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
+
+# Create database tables
 with app.app_context():
     db.create_all()
 
-@app.route('/')
+
+# -----------------------------------
+# HOME
+# -----------------------------------
+
+@app.route("/")
 def home():
-    return "Hello, my task manager is starting!"
+    return redirect(url_for("login"))
 
-@app.route('/signup', methods=['GET', 'POST'])
+
+# -----------------------------------
+# SIGNUP
+# -----------------------------------
+
+@app.route("/signup", methods=["GET", "POST"])
 def signup():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
 
+    if request.method == "POST":
+
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+
+        # Check empty fields
+        if not username or not password:
+            return render_template(
+                "signup.html",
+                error="Username and password are required."
+            )
+
+        # Strong password validation
         valid, message = is_strong_password(password)
+
         if not valid:
-            return render_template('signup.html', error=message)
+            return render_template(
+                "signup.html",
+                error=message
+            )
 
-        existing_user = User.query.filter_by(username=username).first()
+        # Check existing user
+        existing_user = User.query.filter_by(
+            username=username
+        ).first()
+
         if existing_user:
-            return render_template('signup.html', error="Username already taken")
+            return render_template(
+                "signup.html",
+                error="Username already taken."
+            )
 
-        new_user = User(username=username) 
+        # Create user
+        new_user = User(username=username)
+
         new_user.set_password(password)
+
         db.session.add(new_user)
         db.session.commit()
-        return redirect(url_for('login'))
 
-    return render_template('signup.html')
-@app.route('/login', methods=['GET', 'POST'])
+        return redirect(url_for("login"))
+
+    return render_template("signup.html")
+
+
+# -----------------------------------
+# LOGIN
+# -----------------------------------
+
+@app.route("/login", methods=["GET", "POST"])
 def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
 
-        user = User.query.filter_by(username=username).first()
+    if request.method == "POST":
+
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+
+        user = User.query.filter_by(
+            username=username
+        ).first()
+
         if user and user.check_password(password):
-            login_user(user)
-            return redirect(url_for('dashboard'))
-        return render_template('login.html', error="Invalid username or password")
 
-    return render_template('login.html')
-@app.route('/logout')
+            login_user(user)
+
+            return redirect(
+                url_for("dashboard")
+            )
+
+        return render_template(
+            "login.html",
+            error="Invalid username or password."
+        )
+
+    return render_template("login.html")
+
+
+# -----------------------------------
+# LOGOUT
+# -----------------------------------
+
+@app.route("/logout")
 @login_required
 def logout():
-    logout_user()
-    return "Logged out"
 
-@app.route('/dashboard')
+    logout_user()
+
+    return redirect(
+        url_for("login")
+    )
+
+
+# -----------------------------------
+# DASHBOARD
+# -----------------------------------
+
+@app.route("/dashboard")
 @login_required
 def dashboard():
-    tasks = Task.query.filter_by(user_id=current_user.id).all()
-    return render_template('dashboard.html', username=current_user.username, tasks=tasks)
 
-@app.route('/tasks', methods=['GET'])
+    tasks = Task.query.filter_by(
+        user_id=current_user.id
+    ).all()
+
+    return render_template(
+        "dashboard.html",
+        username=current_user.username,
+        tasks=tasks
+    )
+
+
+# -----------------------------------
+# GET TASKS
+# -----------------------------------
+
+@app.route("/tasks", methods=["GET"])
 @login_required
 def get_tasks():
-    tasks = Task.query.filter_by(user_id=current_user.id).all()
-    result = ""
-    for t in tasks:
-        result += f"ID:{t.id} | {t.title} | {t.status} | due:{t.due_date}<br>"
-    return result if result else "No tasks yet"
 
-@app.route('/tasks/add', methods=['POST'])
+    tasks = Task.query.filter_by(
+        user_id=current_user.id
+    ).all()
+
+    result = ""
+
+    for task in tasks:
+
+        result += (
+            f"ID: {task.id} | "
+            f"{task.title} | "
+            f"{task.status} | "
+            f"Due: {task.due_date}<br>"
+        )
+
+    return result if result else "No tasks yet."
+
+
+# -----------------------------------
+# ADD TASK
+# -----------------------------------
+
+@app.route("/tasks/add", methods=["POST"])
 @login_required
 def add_task():
-    title = request.form['title']
-    description = request.form.get('description', '')
-    due_date = request.form.get('due_date', '')
 
-    new_task = Task(title=title, description=description, due_date=due_date, user_id=current_user.id)
+    title = request.form.get("title", "").strip()
+
+    description = request.form.get(
+        "description",
+        ""
+    ).strip()
+
+    due_date = request.form.get(
+        "due_date",
+        ""
+    )
+
+    if not title:
+        return redirect(
+            url_for("dashboard")
+        )
+
+    new_task = Task(
+        title=title,
+        description=description,
+        due_date=due_date,
+        user_id=current_user.id
+    )
+
     db.session.add(new_task)
     db.session.commit()
-    return redirect(url_for('dashboard'))
 
-@app.route('/tasks/<int:task_id>/update', methods=['POST'])
+    return redirect(
+        url_for("dashboard")
+    )
+
+
+# -----------------------------------
+# UPDATE / MARK TASK DONE
+# -----------------------------------
+
+@app.route(
+    "/tasks/<int:task_id>/update",
+    methods=["POST"]
+)
 @login_required
 def update_task(task_id):
+
     task = Task.query.get_or_404(task_id)
+
+    # Security: users can update only their own tasks
     if task.user_id != current_user.id:
         return "Not authorized", 403
 
-    task.status = request.form.get('status', task.status)
-    db.session.commit()
-    return redirect(url_for('dashboard'))
+    task.status = request.form.get(
+        "status",
+        task.status
+    )
 
-@app.route('/tasks/<int:task_id>/delete', methods=['POST'])
+    db.session.commit()
+
+    return redirect(
+        url_for("dashboard")
+    )
+
+
+# -----------------------------------
+# DELETE TASK
+# -----------------------------------
+
+@app.route(
+    "/tasks/<int:task_id>/delete",
+    methods=["POST"]
+)
 @login_required
 def delete_task(task_id):
+
     task = Task.query.get_or_404(task_id)
+
+    # Security: users can delete only their own tasks
     if task.user_id != current_user.id:
         return "Not authorized", 403
 
     db.session.delete(task)
+
     db.session.commit()
-    return redirect(url_for('dashboard'))
-    
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=3000)
+
+    return redirect(
+        url_for("dashboard")
+    )
+
+
+# -----------------------------------
+# RUN APPLICATION
+# -----------------------------------
+
+if __name__ == "__main__":
+
+    app.run(
+        host="0.0.0.0",
+        port=3000,
+        debug=True
+    )
